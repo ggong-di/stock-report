@@ -158,7 +158,7 @@ def summarize_news(title: str, summary: str) -> str:
 
 
 def get_news() -> list:
-    """증시 관련 뉴스만 필터링해서 반환"""
+    """증시 관련 뉴스 필터링 — (출처, 제목, 링크) 반환"""
     results = []
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     for source, url in NEWS_FEEDS:
@@ -168,14 +168,13 @@ def get_news() -> list:
                 content = resp.read()
             feed = feedparser.parse(content)
             for entry in feed.entries:
-                title = clean_text(entry.get("title", ""), 60)
-                summary = clean_text(
-                    entry.get("summary", "") or entry.get("description", ""), 120
-                )
+                title   = clean_text(entry.get("title", ""), 60)
+                summary = clean_text(entry.get("summary", "") or entry.get("description", ""), 120)
+                link    = entry.get("link", "").strip()
                 if not title:
                     continue
                 if is_market_news(title, summary):
-                    results.append((source, title, summary))
+                    results.append((source, title, link))
                 if len(results) >= 8:
                     break
         except Exception:
@@ -201,6 +200,93 @@ def get_top_movers(stocks: dict, top_n: int = 3):
 def arrow(pct): return "▲" if pct > 0 else ("▼" if pct < 0 else "─")
 def sign(pct):  return "+" if pct >= 0 else ""
 def tag(pct):   return "🔴" if pct > 0 else ("🔵" if pct < 0 else "⚪")
+
+
+# ── 개별 종목 추천 풀 (날짜별 순환으로 5개 선택) ─────────────────
+STOCK_PICKS = [
+    {
+        "name": "엔비디아 (NVDA)",
+        "symbol": "NVDA",
+        "why": "AI 반도체 1위. 챗GPT·데이터센터 수요 폭발로 실적 매 분기 사상 최대. 5년 후에도 AI 수요는 계속 커질 것.",
+        "risk": "주가 이미 많이 올라서 고평가 논란. 단기 변동성 큼.",
+        "type": "미국 주식",
+    },
+    {
+        "name": "SK하이닉스 (000660)",
+        "symbol": "000660.KS",
+        "why": "HBM(고대역폭 메모리) 세계 1위. 엔비디아에 독점 공급 중. AI 수혜 최대 국내 기업.",
+        "risk": "반도체 업황 사이클에 민감. 메모리 가격 하락 시 실적 급락 가능.",
+        "type": "국내 주식",
+    },
+    {
+        "name": "TSMC (TSM)",
+        "symbol": "TSM",
+        "why": "세계 최첨단 반도체 위탁생산 독점. 애플·엔비디아·AMD 모두 여기서 만듦. 대체 불가 기업.",
+        "risk": "대만-중국 지정학 리스크 항상 존재.",
+        "type": "미국 주식",
+    },
+    {
+        "name": "마이크로소프트 (MSFT)",
+        "symbol": "MSFT",
+        "why": "오픈AI에 130억달러 투자. Azure 클라우드 + Copilot AI로 기업 시장 장악 중. 배당도 꾸준히 줌.",
+        "risk": "주가 고평가 구간. 빅테크 규제 리스크.",
+        "type": "미국 주식",
+    },
+    {
+        "name": "삼성전자 (005930)",
+        "symbol": "005930.KS",
+        "why": "HBM 경쟁에서 뒤처졌지만 회복 중. 현재 역대 최저 PER 수준으로 저평가. 배당수익률 약 3%.",
+        "risk": "HBM 수율 문제 해결 안 되면 추가 하락 가능.",
+        "type": "국내 주식",
+    },
+    {
+        "name": "아람코 (2222.SR) / 에너지 ETF",
+        "symbol": "XLE",
+        "why": "중동 불안 지속 시 유가 상승 수혜. 포트폴리오 방어 목적으로 소량 보유 권장.",
+        "risk": "유가 하락 시 동반 하락. 친환경 전환 장기 리스크.",
+        "type": "미국 ETF",
+    },
+    {
+        "name": "리튬 아메리카스 / 2차전지 ETF (KODEX 2차전지)",
+        "symbol": "305720.KS",
+        "why": "전기차 보급 확대로 배터리 수요 장기 증가. 현재 조정 구간으로 저점 매수 기회일 수 있음.",
+        "risk": "전기차 수요 둔화 시 타격. 중국 배터리 업체와 경쟁 심화.",
+        "type": "국내 ETF",
+    },
+    {
+        "name": "애플 (AAPL)",
+        "symbol": "AAPL",
+        "why": "아이폰16 AI 기능 탑재로 교체 수요 기대. 서비스 매출(앱스토어·애플페이) 매년 성장. 자사주 매입 꾸준히 함.",
+        "risk": "중국 시장 점유율 하락 중. 아이폰 의존도 높음.",
+        "type": "미국 주식",
+    },
+    {
+        "name": "현대차 (005380)",
+        "symbol": "005380.KS",
+        "why": "미국 관세 우려에도 현지 생산 확대로 대응 중. 배당수익률 약 4%. PER 4배대로 극도 저평가.",
+        "risk": "글로벌 전기차 경쟁 심화. 환율 민감.",
+        "type": "국내 주식",
+    },
+    {
+        "name": "브로드컴 (AVGO)",
+        "symbol": "AVGO",
+        "why": "AI 맞춤형 반도체(ASIC) 설계 강자. 구글·메타·애플 등에 커스텀 칩 공급. 엔비디아 대안주로 주목.",
+        "risk": "고평가. 단일 고객 의존도 높음.",
+        "type": "미국 주식",
+    },
+]
+
+
+def get_daily_picks(n: int = 5) -> list:
+    """날짜 기반으로 5개 종목 순환 선택 후 시세 추가"""
+    today_idx = date.today().timetuple().tm_yday
+    picks = []
+    for i in range(n):
+        pick = STOCK_PICKS[(today_idx + i) % len(STOCK_PICKS)].copy()
+        q = get_quote(pick["symbol"])
+        pick["quote"] = q
+        picks.append(pick)
+    return picks
 
 
 def macro_comment(macro_data: dict) -> list:
@@ -264,6 +350,8 @@ def build_report() -> str:
     print("  → 급등락 종목 수집 중...")
     kr_gain, kr_loss = get_top_movers(STOCKS_KR)
     us_gain, us_loss = get_top_movers(STOCKS_US)
+    print("  → 추천 종목 수집 중...")
+    daily_picks = get_daily_picks(5)
     print("  → 뉴스 수집 중...")
     news_list = get_news()
 
@@ -275,21 +363,16 @@ def build_report() -> str:
     L.append(f"  {today.strftime('%Y년 %m월 %d일')} ({weekday}요일)")
     L.append("=" * W)
 
-    # ── 1. 오늘의 증시 뉴스 요약 ──────────────────────────────────
+    # ── 1. 오늘의 증시 뉴스 ──────────────────────────────────────
     L.append("\n【 오늘의 증시 핵심 뉴스 📰 】")
     L.append("-" * W)
-    L.append("  ※ 증시에 영향을 주는 뉴스만 골라 1~2줄 요약했어요\n")
+    L.append("  ※ 제목 클릭해서 기사 읽어보세요\n")
     if news_list:
-        for i, (source, title, summary) in enumerate(news_list, 1):
-            # 제목이 충분하면 제목만, 요약이 다른 내용이면 추가
-            if summary and len(summary) > 10 and summary[:20] not in title:
-                line = f"  {i}. {title} — {summary}"
-            else:
-                line = f"  {i}. {title}"
-            # 한 줄에 80자 넘으면 줄바꿈
-            if len(line) > 82:
-                line = line[:82] + "…"
-            L.append(line)
+        for i, (source, title, link) in enumerate(news_list, 1):
+            L.append(f"  {i}. [{source}] {title}")
+            if link:
+                L.append(f"     {link}")
+            L.append("")
     else:
         L.append("  뉴스를 불러오지 못했어요. 한경·매경 직접 확인해주세요.")
 
@@ -344,7 +427,23 @@ def build_report() -> str:
     for name, price, pct in us_loss:
         L.append(f"    🔵 {name:<16} ${price:>9,.2f}   ▼ {pct:.2f}%")
 
-    # ── 5. 추천 ETF ──────────────────────────────────────────────
+    # ── 5. 오늘의 개별 종목 추천 5 ──────────────────────────────────
+    L.append("\n【 오늘의 개별 종목 추천 5 💎 】")
+    L.append("-" * W)
+    L.append("  ※ 매일 다른 5종목 소개 | ISA 계좌로 소액 분산 추천\n")
+    for i, pick in enumerate(daily_picks, 1):
+        q = pick.get("quote")
+        if q:
+            price_str = f"${q['price']:,.2f}" if pick["type"] in ("미국 주식","미국 ETF") else f"{q['price']:,.0f}원"
+            perf = f"{arrow(q['pct'])} {sign(q['pct'])}{q['pct']:.2f}%"
+        else:
+            price_str, perf = "조회 불가", ""
+        L.append(f"  {i}. {pick['name']} [{pick['type']}]  {price_str}  {perf}")
+        L.append(f"     ✅ 추천 이유: {pick['why']}")
+        L.append(f"     ⚠️  리스크:   {pick['risk']}")
+        L.append("")
+
+    # ── 6. 추천 ETF ──────────────────────────────────────────────
     L.append("\n【 추천 ETF 시세 】")
     L.append("-" * W)
     for name, q in etf_data.items():
